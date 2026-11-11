@@ -193,9 +193,12 @@
         <div class="note">去 modelscope.cn → 右上角头像 → Access Token（https://modelscope.cn/my/myaccesstoken）复制 token 粘贴。<b>前置：账号须先绑定阿里云并完成实名认证，否则会 401（Please bind your Alibaba Cloud account）。</b>Token 格式 ms-xxxx，只粘 token 本体，不要带 Bearer 前缀或前后空格。用本地代理(server.js)时可留空。</div>
       </div>
       <div class="field">
-        <label>模型名（ModelScope Model-Id）</label>
-        <input id="setModel" placeholder="Qwen/Qwen2.5-72B-Instruct（免费）" />
-        <div class="note">填魔搭上的模型 Model-Id，如 Qwen/Qwen2.5-72B-Instruct；额度紧张可换更小的 Qwen/Qwen2.5-7B-Instruct</div>
+        <label>模型（ModelScope Model-Id）</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="setModel" style="flex:1;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;font-family:inherit;background:#fff"></select>
+          <button class="btn" id="refreshModels" type="button">刷新</button>
+        </div>
+        <div class="note">默认 <b>Qwen/Qwen3.8-Flash-Next</b>（国内免费、已实测可用）。点「刷新」从魔榨拉当前可用模型列表选择。注意：魔搭并非所有模型都能经 API 调用，若报 400「has no provider supported」说明该模型未在 API-Inference 部署，换一个即可。</div>
       </div>
       <div class="field">
         <button class="btn" id="testBtn">测试连接</button>
