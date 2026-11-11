@@ -155,8 +155,9 @@
   // ---------- AI 流式调用 ----------
   function callAI(sys, user) {
     var s = loadSettings();
-    var base = (s.baseURL || "https://api.openai.com/v1").replace(/\/+$/, "");
-    var model = s.model || "gpt-4o-mini";
+    // 默认改走硅基流动 SiliconFlow：国内可达、OpenAI 兼容、已开放浏览器跨域(CORS)、有免费模型
+    var base = (s.baseURL || "https://api.siliconflow.cn/v1").replace(/\/+$/, "");
+    var model = s.model || "Qwen/Qwen2.5-7B-Instruct";
     var body = {
       model: model,
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
@@ -166,10 +167,16 @@
     var headers = { "Content-Type": "application/json" };
     if (s.apiKey) headers["Authorization"] = "Bearer " + s.apiKey;
 
+    // 防止目标接口连不上/被墙时 fetch 永久挂起 → 一直「生成中」看不到结果
+    var controller = new AbortController();
+    var gotFirst = false;
+    var watchdog = setTimeout(function () { if (!gotFirst) controller.abort(); }, 30000);
+
     return fetch(base + "/chat/completions", {
       method: "POST",
       headers: headers,
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     }).then(function (res) {
       if (!res.ok) {
         return res.text().then(function (t) {
@@ -198,13 +205,16 @@
               try {
                 var j = JSON.parse(data);
                 var c = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
-                if (c) out += c;
+                if (c) { out += c; gotFirst = true; clearTimeout(watchdog); }
               } catch (e) { /* ignore partial */ }
             }
             return { done: false, value: out };
           });
         }
       };
+    }, function (err) {
+      clearTimeout(watchdog);
+      throw err;
     });
   }
 
@@ -268,8 +278,20 @@
       setToolbarBusy(false);
       saveTrees(state.trees);
       renderTree();
-      toast("出错：" + err.message);
+      toast(friendlyError(err));
     });
+  }
+
+  // 把底层错误翻译成人话，并指向可行的解决办法
+  function friendlyError(err) {
+    if (err && err.name === "AbortError") {
+      return "超时：30 秒内无响应，多半是网络连不上该接口（如 OpenAI 在中国大陆被限制）。建议改「设置」里的 Base URL 为 https://api.siliconflow.cn/v1（国内可用、已开放跨域）";
+    }
+    var m = (err && err.message) || String(err);
+    if (/Failed to fetch|NetworkError|Load failed|TypeError/i.test(m)) {
+      return "网络/跨域错误：" + m + "。若是 CORS 跨域被拦，建议用硅基流动 SiliconFlow 或本地代理 server.js";
+    }
+    return "出错：" + m;
   }
 
   function updateNodeText(id, txt) {
@@ -457,7 +479,7 @@
     toast("设置已保存");
   }
   function testConnection() {
-    var base = document.getElementById("setBase").value.trim().replace(/\/+$/, "") || "https://api.openai.com/v1";
+    var base = document.getElementById("setBase").value.trim().replace(/\/+$/, "") || "https://api.siliconflow.cn/v1";
     var key = document.getElementById("setKey").value.trim();
     var res = document.getElementById("testResult");
     res.textContent = "测试中…";
