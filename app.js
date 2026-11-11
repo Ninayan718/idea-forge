@@ -157,7 +157,7 @@
     var s = loadSettings();
     // 默认走魔搭 ModelScope API-Inference：国内可达、OpenAI 兼容、chat 接口已开放浏览器跨域(CORS)、有免费额度
     var base = (s.baseURL || "https://api-inference.modelscope.cn/v1").replace(/\/+$/, "");
-    var model = s.model || "Qwen/Qwen2.5-72B-Instruct";
+    var model = s.model || "Qwen/Qwen3.8-Flash-Next";
     var body = {
       model: model,
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
@@ -288,6 +288,12 @@
       return "超时：30 秒内无响应，多半是网络连不上该接口或接口未返回。检查「设置」里的 Base URL 与网络；若目标接口未开放浏览器跨域，请用本地代理 server.js";
     }
     var m = (err && err.message) || String(err);
+    if (/400/.test(m) && /has no provider supported/i.test(m)) {
+      return "模型不可用（400）：该模型未在魔搭 API-Inference 部署，无法调用。请打开「设置」点「刷新」从列表里换一个当前可用的模型。";
+    }
+    if (/400/.test(m)) {
+      return "请求被拒（400）：" + m.replace(/^API 400：/, "") + "。检查模型名或参数是否正确。";
+    }
     if (/Failed to fetch|NetworkError|Load failed|TypeError/i.test(m)) {
       return "网络/跨域错误：" + m + "。若是 CORS 跨域被拦，建议用本地代理 server.js（密钥不进前端）";
     }
@@ -463,9 +469,50 @@
     var s = loadSettings();
     document.getElementById("setBase").value = s.baseURL || "";
     document.getElementById("setKey").value = s.apiKey || "";
-    document.getElementById("setModel").value = s.model || "";
+    var sel = document.getElementById("setModel");
+    var cur = s.model || "Qwen/Qwen3.8-Flash-Next";
+    // 确保默认项存在，避免下拉为空导致 value 为空
+    var exists = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === cur) { exists = true; break; }
+    }
+    if (!exists) {
+      var o = document.createElement("option");
+      o.value = cur; o.textContent = cur + "（默认）";
+      sel.appendChild(o);
+    }
+    sel.value = cur;
     document.getElementById("testResult").textContent = "";
     document.getElementById("settingsModal").classList.remove("hidden");
+  }
+  // 从魔搭拉当前可用模型列表，填充下拉；列表里也未必都能调，但比硬编码准
+  function refreshModels() {
+    var base = document.getElementById("setBase").value.trim().replace(/\/+$/, "") || "https://api-inference.modelscope.cn/v1";
+    var key = document.getElementById("setKey").value.trim();
+    var sel = document.getElementById("setModel");
+    var btn = document.getElementById("refreshModels");
+    btn.disabled = true; btn.textContent = "刷新中…";
+    var headers = {};
+    if (key) headers["Authorization"] = "Bearer " + key;
+    fetch(base + "/models", { headers: headers })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) {
+        var ids = (j.data || []).map(function (m) { return m.id; });
+        var cur = sel.value;
+        sel.innerHTML = "";
+        ids.forEach(function (id) {
+          var o = document.createElement("option");
+          o.value = id; o.textContent = id;
+          sel.appendChild(o);
+        });
+        if (cur) sel.value = cur;
+        btn.disabled = false; btn.textContent = "刷新";
+        toast("已拉取 " + ids.length + " 个模型，挑一个可用的即可");
+      })
+      .catch(function (e) {
+        btn.disabled = false; btn.textContent = "刷新";
+        toast("拉取模型列表失败：" + (e.message || e) + "（仍可手动在设置里直接输入模型名）");
+      });
   }
   function closeSettings() { document.getElementById("settingsModal").classList.add("hidden"); }
   function saveSettingsUI() {
@@ -481,7 +528,7 @@
   function testConnection() {
     var base = document.getElementById("setBase").value.trim().replace(/\/+$/, "") || "https://api-inference.modelscope.cn/v1";
     var key = document.getElementById("setKey").value.trim();
-    var model = document.getElementById("setModel").value.trim() || "Qwen/Qwen2.5-72B-Instruct";
+    var model = document.getElementById("setModel").value.trim() || "Qwen/Qwen3.8-Flash-Next";
     var res = document.getElementById("testResult");
     res.textContent = "测试中…";
     var headers = { "Content-Type": "application/json" };
@@ -521,6 +568,7 @@
     document.getElementById("setCancel").onclick = closeSettings;
     document.getElementById("setSave").onclick = saveSettingsUI;
     document.getElementById("testBtn").onclick = testConnection;
+    document.getElementById("refreshModels").onclick = refreshModels;
     document.getElementById("settingsMask").onclick = function (e) {
       if (e.target.id === "settingsMask") closeSettings();
     };
