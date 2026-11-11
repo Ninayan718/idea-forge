@@ -184,18 +184,18 @@
       <h3>API 设置</h3>
       <div class="field">
         <label>Base URL（OpenAI 兼容）</label>
-        <input id="setBase" placeholder="https://api.siliconflow.cn/v1" />
-        <div class="note">推荐硅基流动 SiliconFlow：国内可用、已开放浏览器跨域、有免费模型。OpenAI 在中国大陆连不上，请勿用默认。本地代理(server.js)模式填 http://localhost:8787，密钥由代理保管。</div>
+        <input id="setBase" placeholder="https://api-inference.modelscope.cn/v1" />
+        <div class="note">默认魔搭 ModelScope API-Inference：国内可达、OpenAI 兼容、chat 接口已开放浏览器跨域、有免费额度。本地代理(server.js)模式填 http://localhost:8787，密钥由代理保管。</div>
       </div>
       <div class="field">
-        <label>API Key</label>
-        <input id="setKey" placeholder="sk-..." type="password" />
-        <div class="note">直连模式必填（去 siliconflow.cn 注册拿免费 key）；用本地代理(server.js)时可留空</div>
+        <label>API Key（魔搭 Access Token）</label>
+        <input id="setKey" placeholder="未填写" type="password" />
+        <div class="note">去 modelscope.cn → 右上角头像 → Access Token（https://modelscope.cn/my/myaccesstoken）复制 token 粘贴。用本地代理(server.js)时可留空。</div>
       </div>
       <div class="field">
-        <label>模型名</label>
-        <input id="setModel" placeholder="Qwen/Qwen2.5-7B-Instruct（免费）" />
-        <div class="note">SiliconFlow 免费模型示例；也可换 deepseek-ai/DeepSeek-V3 等</div>
+        <label>模型名（ModelScope Model-Id）</label>
+        <input id="setModel" placeholder="Qwen/Qwen2.5-72B-Instruct（免费）" />
+        <div class="note">填魔搭上的模型 Model-Id，如 Qwen/Qwen2.5-72B-Instruct；额度紧张可换更小的 Qwen/Qwen2.5-7B-Instruct</div>
       </div>
       <div class="field">
         <button class="btn" id="testBtn">测试连接</button>
