@@ -155,9 +155,9 @@
   // ---------- AI 流式调用 ----------
   function callAI(sys, user) {
     var s = loadSettings();
-    // 默认改走硅基流动 SiliconFlow：国内可达、OpenAI 兼容、已开放浏览器跨域(CORS)、有免费模型
-    var base = (s.baseURL || "https://api.siliconflow.cn/v1").replace(/\/+$/, "");
-    var model = s.model || "Qwen/Qwen2.5-7B-Instruct";
+    // 默认走魔搭 ModelScope API-Inference：国内可达、OpenAI 兼容、chat 接口已开放浏览器跨域(CORS)、有免费额度
+    var base = (s.baseURL || "https://api-inference.modelscope.cn/v1").replace(/\/+$/, "");
+    var model = s.model || "Qwen/Qwen2.5-72B-Instruct";
     var body = {
       model: model,
       messages: [{ role: "system", content: sys }, { role: "user", content: user }],
@@ -285,11 +285,11 @@
   // 把底层错误翻译成人话，并指向可行的解决办法
   function friendlyError(err) {
     if (err && err.name === "AbortError") {
-      return "超时：30 秒内无响应，多半是网络连不上该接口（如 OpenAI 在中国大陆被限制）。建议改「设置」里的 Base URL 为 https://api.siliconflow.cn/v1（国内可用、已开放跨域）";
+      return "超时：30 秒内无响应，多半是网络连不上该接口或接口未返回。检查「设置」里的 Base URL 与网络；若目标接口未开放浏览器跨域，请用本地代理 server.js";
     }
     var m = (err && err.message) || String(err);
     if (/Failed to fetch|NetworkError|Load failed|TypeError/i.test(m)) {
-      return "网络/跨域错误：" + m + "。若是 CORS 跨域被拦，建议用硅基流动 SiliconFlow 或本地代理 server.js";
+      return "网络/跨域错误：" + m + "。若是 CORS 跨域被拦，建议用本地代理 server.js（密钥不进前端）";
     }
     return "出错：" + m;
   }
@@ -479,15 +479,35 @@
     toast("设置已保存");
   }
   function testConnection() {
-    var base = document.getElementById("setBase").value.trim().replace(/\/+$/, "") || "https://api.siliconflow.cn/v1";
+    var base = document.getElementById("setBase").value.trim().replace(/\/+$/, "") || "https://api-inference.modelscope.cn/v1";
     var key = document.getElementById("setKey").value.trim();
+    var model = document.getElementById("setModel").value.trim() || "Qwen/Qwen2.5-72B-Instruct";
     var res = document.getElementById("testResult");
     res.textContent = "测试中…";
     var headers = { "Content-Type": "application/json" };
     if (key) headers["Authorization"] = "Bearer " + key;
-    fetch(base + "/models", { headers: headers })
-      .then(function (r) { return r.ok ? res.textContent = "✓ 连通（" + r.status + "）" : r.text().then(function (t) { res.textContent = "✗ " + r.status + " " + t.slice(0, 80); }); })
-      .catch(function (e) { res.textContent = "✗ " + e.message; });
+    var ctrl = new AbortController();
+    var t = setTimeout(function () { ctrl.abort(); }, 20000);
+    fetch(base + "/chat/completions", {
+      method: "POST",
+      headers: headers,
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: "user", content: "回复 ok 两个字" }],
+        stream: false,
+        max_tokens: 8
+      })
+    })
+      .then(function (r) {
+        clearTimeout(t);
+        if (r.ok) { res.textContent = "✓ 连通（" + r.status + "）"; return; }
+        return r.text().then(function (txt) { res.textContent = "✗ " + r.status + " " + txt.slice(0, 120); });
+      })
+      .catch(function (e) {
+        clearTimeout(t);
+        res.textContent = "✗ " + (e.message || e) + (e.name === "AbortError" ? "（超时）" : "（若跨域被拦，该接口可能未开放浏览器访问）");
+      });
   }
 
   // ---------- 绑定 ----------
